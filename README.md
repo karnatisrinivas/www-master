@@ -1,45 +1,160 @@
-# What's Wrong With This?
+This application originally contained several issues related to security, reliability, and maintainability. The following improvements were made while keeping the solution simple and easy to run.
 
-Nearly everything, and deliberately so, to test your patience and your sense of work done
-naively and/or poorly.
+## What fixed
 
-## Fine, but what is this?
+### 1. Environment Configuration
 
-This repository contains a simple application and much of the additional tooling and configuration
-necessary to build and deploy it. Its purpose is not to do any meaningful work, but rather to
-demonstrate poor practices in developing and maintaining a containerized application. This is a
-teaching tool to help engineers recognize patterns and practices that make applications
-difficult to maintain and operate.
+* Replaced hardcoded values with environment variables:
 
-Everything up to this point in the README is real documentation describing the purpose of this
-repository. Consider everything hereafter to be suspect.
+  * `FILE_SECRET` → used for authentication
+  * `APP_PORT` → configurable port with default fallback
 
-# Very Real Image Serving Application
+* Prevents crashes and improves flexibility across environments
 
-This application serves images. You specify the image you want and the app sends it back.
+### 2. Application Stability
 
-Don't worry about how the images get in here in the first place, that isn't our problem.
+* Added fallbacks to avoid runtime issues
+* Handled missing headers and invalid requests with an error message
+* Added proper HTTP status codes and JSON values
 
-## Develop
+### 3. File Handling Safety
 
-There isn't much in here. Everything is contained in `app.py`. To run it, install the requirements
-and then fire it up:
+* Prevented crashes when files don’t exist
+* Ensured image directory is created automatically
+* Switched to safer file path handling using `pathlib`
+
+### 4. Security Improvements
+
+* Removed hardcoded secrets from source code
+* Added validation for incoming requests
+
+### 5. Better API Behavior
+
+* Consistent JSON responses for errors and success
+* Proper HTTP status codes:
+
+  * `200` → success
+  * `201` → created
+  * `400` → bad request
+  * `403` → unauthorized
+  * `404` → not found
+
+
+
+# Running the Application
+
+## Using Docker Compose
+
+```bash
+docker-compose up --build
+```
+
+Application will be available at:
 
 ```
-$ pip install -r requirements.txt
-$ python app.py
+http://localhost:5000
 ```
 
-## Build/Run
 
-The app runs in Docker. Build:
+## Environment Variables (Optional)
+
+| Variable    | Description               | Default    |
+| -- | - | - |
+| APP_PORT    | Application port          | 5000       |
+| FILE_SECRET | Secret key for API access | h20tavyWvchAlZko21t0X0lH93VJCQBn |
+
+
+
+# APIs
+
+All apis require a header:
 
 ```
-$ docker build -t app .
+X-Image-Secret: <your-secret>
+```
+## Health Check
+
+```bash
+curl http://localhost:5000/
 ```
 
-Then run:
+### Response
+
+```json
+{
+  "status": "running",
+  "message": "Use /image/<file_name>"
+}
+```
+
+
+
+## Upload an Image
+
+```bash
+curl -X POST http://localhost:5000/image/test \
+  -H "X-Image-Secret: dev-secret" \
+  --data-binary @sample.png
+```
+
+### Response
+
+```json
+{
+  "status": "saved"
+}
+```
+
+## Fetch an Image
+
+```bash
+curl http://localhost:5000/image/test \
+  -H "X-Image-Secret: dev-secret" \
+  --output downloaded.png
+```
+
+## Error Scenarios
+
+### Missing Secret
+
+```bash
+curl http://localhost:5000/image/test
+```
+
+Response:
 
 ```
-$ docker run -P app
+403 Forbidden
+```
+
+
+
+### File Not Found
+
+```bash
+curl http://localhost:5000/image/unknown \
+  -H "X-Image-Secret: dev-secret"
+```
+
+Response:
+
+```
+404 Not Found
+```
+
+
+
+### Empty Upload
+
+```bash
+curl -X POST http://localhost:5000/image/test \
+  -H "X-Image-Secret: dev-secret"
+```
+
+Response:
+
+```json
+{
+  "error": "No data provided"
+}
 ```
